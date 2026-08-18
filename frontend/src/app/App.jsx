@@ -18,10 +18,30 @@ function App() {
   // Yjs document
   const ydoc = useMemo(() => new Y.Doc(), []);
 
-  // Shared text inside the Yjs document
+  //gets the shared text area named "monaco" from that document.
   const yText = useMemo(() => {
     return ydoc.getText("monaco");
   }, [ydoc]);
+
+//   2. Why useMemo?
+
+// You could technically write:
+
+// const ydoc = new Y.Doc();
+
+// But there's a problem.
+
+// React can re-render your component many times.
+
+// If you do:
+
+// const ydoc = new Y.Doc();
+
+// then every render could create a new Y.Doc.
+
+//The empty dependency array [] means there are no values that should cause the memoized value to be recalculated.
+
+
 
   // Called when Monaco editor finishes mounting
   const handleMount = (editor) => {
@@ -38,6 +58,23 @@ function App() {
 
     setUsername(name);
 
+    //This code is used to change the URL to include the username without refreshing the page.
+    //window.history.pushState(state, title, url);
+
+    //Why encodeURIComponent(name)?
+    // This protects the username if it contains special characters or spaces
+    // For example:
+
+    // encodeURIComponent("Sumit Kumar")
+
+    // produces:
+
+    // Sumit%20Kumar
+
+    // So the URL becomes:
+
+    // http://localhost:5173/?username=Sumit%20Kumar
+
     window.history.pushState(
       {},
       "",
@@ -50,8 +87,8 @@ function App() {
     if (!username || !editor) return;
 
     const provider = new SocketIOProvider(
-      "http://localhost:3000",
-      "monaco",
+      "http://localhost:3000",             // socket io /yjs address
+      "monaco",                        //This is the room/document name.
       ydoc,
       {
         autoConnect: true,
@@ -59,19 +96,74 @@ function App() {
     );
 
     // Add current user to awareness
-    provider.awareness.setLocalStateField("user", {
-      username,
+    provider.awareness.setLocalStateField("user", {               //Awareness lets users share temporary information such as
+      username,                                                //username, cursor position, selection, online/offline state
     });
 
     // Update sidebar users
     const updateUsers = () => {
+
       const states = Array.from(
         provider.awareness.getStates().values()
       );
+      // Getting all awareness states
+      // const states = Array.from(
+      //   provider.awareness.getStates().values()
+      // );
+
+      // This looks complicated, but conceptually it's simple.
+
+      // provider.awareness.getStates()
+
+      // gets the awareness information of all connected clients.
+
+      // Imagine it contains:
+
+      // Map
+
+
+      // Client 1 → { user: { username: "Sumit" } }
+      // Client 2 → { user: { username: "Rahul" } }
+      // Client 3 → { user: { username: "Aman" } }
+
+      // .values() gets the values:
+
+      // { user: { username: "Sumit" } }
+      // { user: { username: "Rahul" } }
+      // { user: { username: "Aman" } }
+
+      // And:
+
+      // Array.from(...)
+
+      // turns them into a normal JavaScript array:
+
+      // [
+      //   { user: { username: "Sumit" } },
+      //   { user: { username: "Rahul" } },
+      //   { user: { username: "Aman" } }
+      // ]
 
       const currentUsers = states
         .filter((state) => state.user?.username)
         .map((state) => state.user);
+// for map Suppose you have:
+
+        // [
+        //   { user: { username: "Sumit" } },
+        //   { user: { username: "Rahul" } }
+        // ]
+
+        // After:
+
+        // .map((state) => state.user)
+
+        // you get:
+
+        // [
+        //   { username: "Sumit" },
+        //   { username: "Rahul" }
+        // ]
 
       console.log("Current users:", currentUsers);
 
@@ -79,7 +171,7 @@ function App() {
     };
 
     // Listen for users joining/leaving
-    provider.awareness.on("change", updateUsers);
+    provider.awareness.on("change", updateUsers);  //updateusers me change hone par listen karta h
 
     // Get current users immediately
     updateUsers();
@@ -89,20 +181,22 @@ function App() {
       provider.awareness.setLocalStateField("user", null);
     };
 
-    window.addEventListener(
-      "beforeunload",
-      handleBeforeUnload
-    );
+    window.addEventListener( "beforeunload", handleBeforeUnload);  //When the browser is about to unload this page, run handleBeforeUnload.
 
     // Connect Yjs document with Monaco
     const monacoBinding = new MonacoBinding(
       yText,
-      editor.getModel(),
-      new Set([editor]),
-      provider.awareness
+      editor.getModel(), //Monaco stores the actual editor content inside a model.
+      new Set([editor]), //This tells the binding which Monaco editor instance should be connected to the Yjs text.(we only have one editor)
+      provider.awareness // shares awareness information to the Monaco binding which
+                         // is useful for collaborative features such as showing other users' cursors/selections.
     );
 
-    // Cleanup
+    // Cleanup function
+    // React runs it when the effect needs to be cleaned up, such as when:
+
+    // the component unmounts
+    // dependencies change and the effect runs again
     return () => {
       provider.awareness.off("change", updateUsers);
 
@@ -117,7 +211,10 @@ function App() {
     };
   }, [username, editor, ydoc, yText]);
 
+
+
   // Show username form
+
   if (!username) {
     return (
       <main className="w-screen h-screen p-3 bg-gray-950 flex justify-center items-center">
