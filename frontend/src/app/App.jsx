@@ -87,7 +87,7 @@ function App() {
     if (!username || !editor) return;
 
     const provider = new SocketIOProvider(
-      "http://localhost:3000",             // socket io /yjs address
+      "/",             // socket io /yjs address
       "monaco",                        //This is the room/document name.
       ydoc,
       {
